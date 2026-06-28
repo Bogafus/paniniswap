@@ -83,9 +83,16 @@ const GROUPS = [
   ]},
 ];
 
+// Catégories spéciales hors équipes nationales : logo officiel de la Coupe du Monde (FWC)
+// et série Coca-Cola, chacune avec son propre nombre de vignettes (différent des 20 par équipe).
+const SPECIAL_CATEGORIES = [
+  { code: "FWC", name: "FIFA World Cup (logo)", flag: "🏆", count: 19 },
+  { code: "CC", name: "Coca-Cola", flag: "🥤", count: 12 },
+];
+
 const NUMS_PER_TEAM = 20; // 20 vignettes numérotées par équipe dans l'album officiel
 
-// Génère le pool complet de stickers à partir des équipes
+// Génère le pool complet de stickers à partir des équipes, plus les catégories spéciales (FWC, Coca-Cola)
 function buildStickerPool() {
   const pool = [];
   GROUPS.forEach((g) => {
@@ -102,6 +109,19 @@ function buildStickerPool() {
         });
       }
     });
+  });
+  SPECIAL_CATEGORIES.forEach((cat) => {
+    for (let n = 1; n <= cat.count; n++) {
+      pool.push({
+        id: `${cat.code}${n}`,
+        team: cat.code,
+        teamName: cat.name,
+        flag: cat.flag,
+        group: "SP",
+        num: n,
+        special: n === cat.count,
+      });
+    }
   });
   return pool;
 }
@@ -261,12 +281,15 @@ function StickerCard({ sticker, mode, qty, onClick, selected, size = "md" }) {
   );
 }
 
-// ---------- Onglet de groupe (façon "Groupe A / B / C / D" du carnet) ----------
+// ---------- Onglet de groupe (façon "Groupe A / B / C / D" du carnet, + onglet "Spéciales") ----------
+
+// Liste combinée pour les onglets : groupes de foot A-L, puis le groupe spécial à la fin.
+const ALL_TABS = [...GROUPS, { code: "SP", teams: SPECIAL_CATEGORIES, isSpecial: true }];
 
 function GroupTabs({ activeGroup, setActiveGroup }) {
   return (
     <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
-      {GROUPS.map((g) => (
+      {ALL_TABS.map((g) => (
         <button
           key={g.code}
           onClick={() => setActiveGroup(g.code)}
@@ -277,7 +300,7 @@ function GroupTabs({ activeGroup, setActiveGroup }) {
             border: "1.5px solid #1C2B33",
           }}
         >
-          GROUPE {g.code}
+          {g.isSpecial ? "SPÉCIALES" : `GROUPE ${g.code}`}
         </button>
       ))}
     </div>
@@ -289,7 +312,8 @@ function GroupTabs({ activeGroup, setActiveGroup }) {
 export function InventoryView({ mine, setMine, activeGroup, setActiveGroup }) {
   const [tab, setTab] = useState("doubles"); // doubles | needs
 
-  const teams = GROUPS.find((g) => g.code === activeGroup).teams;
+  const activeTab = ALL_TABS.find((g) => g.code === activeGroup);
+  const teams = activeTab.teams;
 
   const toggleHave = useCallback(
     (id) => {
@@ -382,7 +406,9 @@ export function InventoryView({ mine, setMine, activeGroup, setActiveGroup }) {
           : "Touche une case vide pour signaler qu'elle te manque."}
       </p>
 
-      {teams.map((t) => (
+      {teams.map((t) => {
+        const stickerCount = t.count || NUMS_PER_TEAM;
+        return (
         <div key={t.code} className="mb-4">
           <div className="flex items-center gap-1.5 mb-1.5">
             <span className="text-[15px]">{t.flag}</span>
@@ -391,7 +417,7 @@ export function InventoryView({ mine, setMine, activeGroup, setActiveGroup }) {
             </span>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {Array.from({ length: NUMS_PER_TEAM }, (_, i) => i + 1).map((n) => {
+            {Array.from({ length: stickerCount }, (_, i) => i + 1).map((n) => {
               const id = `${t.code}${n}`;
               const sticker = STICKER_BY_ID[id];
               const hasDouble = mine.doubles[id];
@@ -423,7 +449,8 @@ export function InventoryView({ mine, setMine, activeGroup, setActiveGroup }) {
             })}
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
