@@ -286,7 +286,7 @@ function GroupTabs({ activeGroup, setActiveGroup }) {
 
 // ---------- Vue Inventaire (onglet principal : mes doubles + mes besoins) ----------
 
-function InventoryView({ mine, setMine, activeGroup, setActiveGroup }) {
+export function InventoryView({ mine, setMine, activeGroup, setActiveGroup }) {
   const [tab, setTab] = useState("doubles"); // doubles | needs
 
   const teams = GROUPS.find((g) => g.code === activeGroup).teams;
@@ -446,15 +446,29 @@ function computeMatch(mine, theirInv) {
 
 // ---------- Vue Matching (l'app propose les meilleurs échanges) ----------
 
-function MatchingView({ mine, onOpenProposal }) {
+export function MatchingView({ mine, neighbors, groupName, onOpenProposal }) {
   const matches = useMemo(() => {
-    return NEIGHBORS.map((n) => {
-      const m = computeMatch(mine, NEIGHBOR_INVENTORIES[n.id]);
-      return { neighbor: n, ...m };
-    })
+    return neighbors
+      .map((n) => {
+        const m = computeMatch(mine, n.inventory);
+        return { neighbor: n, ...m };
+      })
       .filter((m) => m.total > 0)
       .sort((a, b) => b.score - a.score || b.total - a.total);
-  }, [mine]);
+  }, [mine, neighbors]);
+
+  if (neighbors.length === 0) {
+    return (
+      <div className="py-16 text-center">
+        <p className="font-display text-[16px] mb-1" style={{ color: "#1C2B33" }}>
+          Personne d'autre dans ce groupe pour l'instant
+        </p>
+        <p className="text-[13px] opacity-60 max-w-xs mx-auto">
+          Partage le code du groupe avec d'autres parents pour que les suggestions d'échange apparaissent ici.
+        </p>
+      </div>
+    );
+  }
 
   if (matches.length === 0) {
     return (
@@ -475,7 +489,7 @@ function MatchingView({ mine, onOpenProposal }) {
         SUGGESTIONS D'ÉCHANGE
       </h2>
       <p className="text-[13px] opacity-60 mb-4">
-        Classées par échange le plus équilibré, groupe "EIB"
+        Classées par échange le plus équilibré, groupe "{groupName}"
       </p>
 
       <div className="space-y-3">
@@ -488,16 +502,16 @@ function MatchingView({ mine, onOpenProposal }) {
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2.5">
                 <div
-                  className="w-9 h-9 rounded-full flex items-center justify-center text-[16px]"
-                  style={{ background: "#EDEAE1" }}
+                  className="w-9 h-9 rounded-full flex items-center justify-center text-[16px] font-display"
+                  style={{ background: "#EDEAE1", color: "#1C2B33" }}
                 >
-                  {neighbor.avatar}
+                  {neighbor.avatar || neighbor.name.charAt(0).toUpperCase()}
                 </div>
                 <div>
                   <div className="font-display text-[14px] tracking-wide" style={{ color: "#1C2B33" }}>
                     {neighbor.name.toUpperCase()}
                   </div>
-                  <div className="text-[11px] opacity-55">{neighbor.group} · {neighbor.distance}</div>
+                  <div className="text-[11px] opacity-55">{neighbor.group || groupName}{neighbor.distance ? ` · ${neighbor.distance}` : ""}</div>
                 </div>
               </div>
               {score >= 3 && (
@@ -567,7 +581,7 @@ function MatchingView({ mine, onOpenProposal }) {
 
 // ---------- Modale de proposition d'échange ----------
 
-function ProposalModal({ proposal, onClose, onSend }) {
+export function ProposalModal({ proposal, onClose, onSend }) {
   const { neighbor, iCanGive, theyCanGive } = proposal;
   const [selectedGive, setSelectedGive] = useState(() => new Set(iCanGive.slice(0, 3)));
   const [selectedGet, setSelectedGet] = useState(() => new Set(theyCanGive.slice(0, 3)));
@@ -700,7 +714,7 @@ function ProposalModal({ proposal, onClose, onSend }) {
 
 // ---------- Vue Échanges en cours ----------
 
-function TradesView({ trades, onUpdateStatus, onCancel }) {
+export function TradesView({ trades, onUpdateStatus, onCancel }) {
   if (trades.length === 0) {
     return (
       <div className="py-16 text-center">
