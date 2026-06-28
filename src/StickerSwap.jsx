@@ -16,26 +16,74 @@ const GROUPS = [
     { code: "CZE", name: "Tchéquie", flag: "🇨🇿" },
   ]},
   { code: "B", teams: [
+    { code: "SUI", name: "Suisse", flag: "🇨🇭" },
     { code: "CAN", name: "Canada", flag: "🇨🇦" },
     { code: "BIH", name: "Bosnie-Herz.", flag: "🇧🇦" },
     { code: "QAT", name: "Qatar", flag: "🇶🇦" },
-    { code: "SUI", name: "Suisse", flag: "🇨🇭" },
   ]},
   { code: "C", teams: [
     { code: "BRA", name: "Brésil", flag: "🇧🇷" },
     { code: "MAR", name: "Maroc", flag: "🇲🇦" },
-    { code: "HAI", name: "Haïti", flag: "🇭🇹" },
     { code: "SCO", name: "Écosse", flag: "🏴" },
+    { code: "HAI", name: "Haïti", flag: "🇭🇹" },
   ]},
   { code: "D", teams: [
     { code: "USA", name: "USA", flag: "🇺🇸" },
-    { code: "PAR", name: "Paraguay", flag: "🇵🇾" },
     { code: "AUS", name: "Australie", flag: "🇦🇺" },
+    { code: "PAR", name: "Paraguay", flag: "🇵🇾" },
     { code: "TUR", name: "Türkiye", flag: "🇹🇷" },
+  ]},
+  { code: "E", teams: [
+    { code: "GER", name: "Allemagne", flag: "🇩🇪" },
+    { code: "CIV", name: "Côte d'Ivoire", flag: "🇨🇮" },
+    { code: "ECU", name: "Équateur", flag: "🇪🇨" },
+    { code: "CUW", name: "Curaçao", flag: "🇨🇼" },
+  ]},
+  { code: "F", teams: [
+    { code: "NED", name: "Pays-Bas", flag: "🇳🇱" },
+    { code: "JPN", name: "Japon", flag: "🇯🇵" },
+    { code: "SWE", name: "Suède", flag: "🇸🇪" },
+    { code: "TUN", name: "Tunisie", flag: "🇹🇳" },
+  ]},
+  { code: "G", teams: [
+    { code: "BEL", name: "Belgique", flag: "🇧🇪" },
+    { code: "EGY", name: "Égypte", flag: "🇪🇬" },
+    { code: "IRN", name: "Iran", flag: "🇮🇷" },
+    { code: "NZL", name: "Nouvelle-Zélande", flag: "🇳🇿" },
+  ]},
+  { code: "H", teams: [
+    { code: "ESP", name: "Espagne", flag: "🇪🇸" },
+    { code: "CPV", name: "Cap-Vert", flag: "🇨🇻" },
+    { code: "URU", name: "Uruguay", flag: "🇺🇾" },
+    { code: "KSA", name: "Arabie Saoudite", flag: "🇸🇦" },
+  ]},
+  { code: "I", teams: [
+    { code: "FRA", name: "France", flag: "🇫🇷" },
+    { code: "NOR", name: "Norvège", flag: "🇳🇴" },
+    { code: "SEN", name: "Sénégal", flag: "🇸🇳" },
+    { code: "IRQ", name: "Irak", flag: "🇮🇶" },
+  ]},
+  { code: "J", teams: [
+    { code: "ARG", name: "Argentine", flag: "🇦🇷" },
+    { code: "AUT", name: "Autriche", flag: "🇦🇹" },
+    { code: "ALG", name: "Algérie", flag: "🇩🇿" },
+    { code: "JOR", name: "Jordanie", flag: "🇯🇴" },
+  ]},
+  { code: "K", teams: [
+    { code: "COL", name: "Colombie", flag: "🇨🇴" },
+    { code: "POR", name: "Portugal", flag: "🇵🇹" },
+    { code: "COD", name: "RD Congo", flag: "🇨🇩" },
+    { code: "UZB", name: "Ouzbékistan", flag: "🇺🇿" },
+  ]},
+  { code: "L", teams: [
+    { code: "ENG", name: "Angleterre", flag: "🏴" },
+    { code: "GHA", name: "Ghana", flag: "🇬🇭" },
+    { code: "CRO", name: "Croatie", flag: "🇭🇷" },
+    { code: "PAN", name: "Panama", flag: "🇵🇦" },
   ]},
 ];
 
-const NUMS_PER_TEAM = 8; // réduit pour le prototype (réel: 20)
+const NUMS_PER_TEAM = 20; // 20 vignettes numérotées par équipe dans l'album officiel
 
 // Génère le pool complet de stickers à partir des équipes
 function buildStickerPool() {
