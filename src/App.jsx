@@ -1,5 +1,10 @@
+import StickerSwapOnlineApp from "./StickerSwapOnlineApp.jsx";
 import StickerSwapApp from "./StickerSwap.jsx";
+import { supabase } from "./supabaseClient.js";
 
 export default function App() {
-  return <StickerSwapApp />;
+  if (!supabase) {
+    return <StickerSwapApp />;
+  }
+  return <StickerSwapOnlineApp />;
 }
