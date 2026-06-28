@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import JoinScreen from "./JoinScreen.jsx";
-import { resumeSession, clearSession } from "./auth.js";
+import { resumeSession, clearSession, fetchMyGroups, switchActiveGroup, setMyPin } from "./auth.js";
 import {
   fetchMyInventory,
   upsertInventoryItem,
@@ -11,11 +11,11 @@ import {
 } from "./data.js";
 import { InventoryView, MatchingView, TradesView, ProposalModal } from "./StickerSwap.jsx";
 
-// Transforme une ligne "trades" Supabase (avec from_member/to_member joints)
+// Transforme une ligne "trades" Supabase (avec from_person/to_person joints)
 // vers le format attendu par TradesView : { id, neighbor: {name}, give, get, method, status }
-function mapTradeRow(row, myMemberId) {
-  const iAmSender = row.from_member_id === myMemberId;
-  const neighborName = iAmSender ? row.to_member?.display_name : row.from_member?.display_name;
+function mapTradeRow(row, myPersonId) {
+  const iAmSender = row.from_person_id === myPersonId;
+  const neighborName = iAmSender ? row.to_person?.display_name : row.from_person?.display_name;
   return {
     id: row.id,
     neighbor: { name: neighborName || "Voisin" },
@@ -30,6 +30,7 @@ function mapTradeRow(row, myMemberId) {
 
 export default function StickerSwapOnlineApp() {
   const [session, setSession] = useState(undefined); // undefined = chargement, null = pas connecté
+  const [myGroups, setMyGroups] = useState([]); // tous les groupes de cette personne
   const [mine, setMine] = useState({ doubles: {}, needs: {} });
   const [neighbors, setNeighbors] = useState([]);
   const [trades, setTrades] = useState([]);
@@ -38,6 +39,10 @@ export default function StickerSwapOnlineApp() {
   const [proposal, setProposal] = useState(null);
   const [toast, setToast] = useState(null);
   const [loadingData, setLoadingData] = useState(false);
+  const [showGroupSwitcher, setShowGroupSwitcher] = useState(false);
+  const [pinSetupValue, setPinSetupValue] = useState("");
+  const [pinSetupError, setPinSetupError] = useState(null);
+  const [pinDismissed, setPinDismissed] = useState(false);
 
   // Reprise de session au chargement
   useEffect(() => {
@@ -49,18 +54,31 @@ export default function StickerSwapOnlineApp() {
     setTimeout(() => setToast(null), 3200);
   }, []);
 
-  const reloadAll = useCallback(async () => {
+  // L'inventaire est partagé entre tous les groupes (rattaché à la personne),
+  // donc on le recharge dès qu'on a une session, indépendamment du groupe actif.
+  const reloadInventory = useCallback(async () => {
+    if (!session) return;
+    try {
+      const inv = await fetchMyInventory(session.personId);
+      setMine(inv);
+    } catch (err) {
+      showToast(err.message || "Erreur de chargement du carnet.");
+    }
+  }, [session, showToast]);
+
+  // Les suggestions et échanges, eux, dépendent du groupe actuellement affiché.
+  const reloadGroupData = useCallback(async () => {
     if (!session) return;
     setLoadingData(true);
     try {
-      const [inv, members, tradeRows] = await Promise.all([
-        fetchMyInventory(session.memberId),
-        fetchGroupMembersWithInventory(session.groupId, session.memberId),
-        fetchMyTrades(session.groupId, session.memberId),
+      const [members, tradeRows, groups] = await Promise.all([
+        fetchGroupMembersWithInventory(session.groupId, session.personId),
+        fetchMyTrades(session.groupId, session.personId),
+        fetchMyGroups(session.personId),
       ]);
-      setMine(inv);
       setNeighbors(members.map((m) => ({ id: m.id, name: m.name, inventory: m.inventory })));
-      setTrades(tradeRows.map((r) => mapTradeRow(r, session.memberId)));
+      setTrades(tradeRows.map((r) => mapTradeRow(r, session.personId)));
+      setMyGroups(groups);
     } catch (err) {
       showToast(err.message || "Erreur de chargement, réessaie.");
     } finally {
@@ -69,8 +87,9 @@ export default function StickerSwapOnlineApp() {
   }, [session, showToast]);
 
   useEffect(() => {
-    reloadAll();
-  }, [reloadAll]);
+    reloadInventory();
+    reloadGroupData();
+  }, [reloadInventory, reloadGroupData]);
 
   if (session === undefined) {
     return (
@@ -90,11 +109,11 @@ export default function StickerSwapOnlineApp() {
   }
 
   // Bascule "j'ai un double" / "j'ai besoin" : on optimise l'affichage tout de suite (optimistic update),
-  // puis on écrit vraiment en base, et on resynchronise pour rester source-de-vérité-serveur.
+  // puis on écrit vraiment en base (rattaché à la personne, donc visible dans tous ses groupes),
+  // et on resynchronise les suggestions du groupe actif pour refléter le changement.
   const handleSetMine = (updater) => {
     setMine((prev) => {
       const next = typeof updater === "function" ? updater(prev) : updater;
-      // Calcule le diff entre prev et next pour ne pousser que ce qui a changé
       const allIds = new Set([...Object.keys(prev.doubles), ...Object.keys(next.doubles), ...Object.keys(prev.needs), ...Object.keys(next.needs)]);
       allIds.forEach((id) => {
         const prevDouble = prev.doubles[id];
@@ -102,11 +121,11 @@ export default function StickerSwapOnlineApp() {
         const prevNeed = prev.needs[id];
         const nextNeed = next.needs[id];
         if (prevDouble !== nextDouble) {
-          upsertInventoryItem(session.memberId, id, nextDouble ? "double" : nextNeed ? "need" : null, nextDouble || 1).catch((err) =>
+          upsertInventoryItem(session.personId, id, nextDouble ? "double" : nextNeed ? "need" : null, nextDouble || 1).catch((err) =>
             showToast(err.message)
           );
         } else if (prevNeed !== nextNeed) {
-          upsertInventoryItem(session.memberId, id, nextNeed ? "need" : nextDouble ? "double" : null, nextDouble || 1).catch((err) =>
+          upsertInventoryItem(session.personId, id, nextNeed ? "need" : nextDouble ? "double" : null, nextDouble || 1).catch((err) =>
             showToast(err.message)
           );
         }
@@ -119,8 +138,8 @@ export default function StickerSwapOnlineApp() {
     try {
       await createTrade({
         groupId: session.groupId,
-        fromMemberId: session.memberId,
-        toMemberId: proposal.neighbor.id,
+        fromPersonId: session.personId,
+        toPersonId: proposal.neighbor.id,
         giveStickers: give,
         getStickers: get,
         method,
@@ -128,7 +147,8 @@ export default function StickerSwapOnlineApp() {
       setProposal(null);
       showToast(`Demande envoyée à ${proposal.neighbor.name} · vignettes réservées`);
       setScreen("trades");
-      reloadAll();
+      reloadInventory();
+      reloadGroupData();
     } catch (err) {
       showToast(err.message || "Impossible d'envoyer la demande, réessaie.");
     }
@@ -137,7 +157,7 @@ export default function StickerSwapOnlineApp() {
   const handleUpdateStatus = async (tradeId, status) => {
     try {
       await updateTradeStatus(tradeId, status);
-      reloadAll();
+      reloadGroupData();
     } catch (err) {
       showToast(err.message || "Impossible de mettre à jour l'échange.");
     }
@@ -147,9 +167,33 @@ export default function StickerSwapOnlineApp() {
     try {
       await updateTradeStatus(tradeId, "cancelled");
       showToast("Échange annulé · vignettes libérées");
-      reloadAll();
+      reloadInventory();
+      reloadGroupData();
     } catch (err) {
       showToast(err.message || "Impossible d'annuler l'échange.");
+    }
+  };
+
+  const handleSwitchGroup = (group) => {
+    const updated = switchActiveGroup(session, group);
+    setSession(updated);
+    setShowGroupSwitcher(false);
+    showToast(`Groupe actif : ${group.name}`);
+  };
+
+  const handleSetupPin = async (e) => {
+    e.preventDefault();
+    setPinSetupError(null);
+    if (pinSetupValue.length !== 4) {
+      setPinSetupError("Le code doit faire exactement 4 chiffres.");
+      return;
+    }
+    try {
+      await setMyPin(session.personId, pinSetupValue);
+      setSession((prev) => ({ ...prev, hasPin: true }));
+      showToast("Code enregistré — tu pourras l'utiliser depuis un autre appareil.");
+    } catch (err) {
+      setPinSetupError(err.message || "Impossible d'enregistrer le code, réessaie.");
     }
   };
 
@@ -185,9 +229,14 @@ export default function StickerSwapOnlineApp() {
             <div className="font-display text-[19px] tracking-wide leading-none" style={{ color: "#1C2B33" }}>
               PANINISWAP
             </div>
-            <div className="text-[11px] opacity-55 leading-none mt-0.5">
+            <button
+              onClick={() => setShowGroupSwitcher((v) => !v)}
+              className="text-[11px] opacity-70 leading-none mt-0.5 flex items-center gap-1"
+              style={{ color: "#1C2B33" }}
+            >
               {session.displayName} · {session.groupName}
-            </div>
+              {myGroups.length > 1 && <span aria-hidden="true">▾</span>}
+            </button>
           </div>
         </div>
         <button
@@ -201,6 +250,76 @@ export default function StickerSwapOnlineApp() {
           changer de compte
         </button>
       </div>
+
+      {!session.hasPin && !pinDismissed && (
+        <div className="px-5 pb-2 max-w-md mx-auto">
+          <form
+            onSubmit={handleSetupPin}
+            className="rounded-[12px] p-3"
+            style={{ background: "#FFFFFF", boxShadow: "0 1px 3px rgba(28,43,51,0.12)" }}
+          >
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <p className="text-[12px] leading-snug" style={{ color: "#1C2B33" }}>
+                Crée un code à 4 chiffres pour pouvoir te reconnecter depuis un autre téléphone plus tard.
+              </p>
+              <button
+                type="button"
+                onClick={() => setPinDismissed(true)}
+                className="text-[14px] opacity-40 shrink-0"
+                style={{ color: "#1C2B33" }}
+              >
+                ×
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <input
+                value={pinSetupValue}
+                onChange={(e) => setPinSetupValue(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                placeholder="••••"
+                inputMode="numeric"
+                className="flex-1 px-3 py-2 rounded-[8px] font-display text-[15px] tracking-[0.3em] text-center outline-none"
+                style={{ background: "#F7F4ED", border: "1.5px solid #C8CDD1", color: "#1C2B33" }}
+              />
+              <button
+                type="submit"
+                className="px-4 rounded-[8px] font-display text-[12px] tracking-wide"
+                style={{ background: "#3F8755", color: "#F7F4ED" }}
+              >
+                VALIDER
+              </button>
+            </div>
+            {pinSetupError && (
+              <p className="text-[11px] mt-1.5" style={{ color: "#E8543E" }}>
+                {pinSetupError}
+              </p>
+            )}
+          </form>
+        </div>
+      )}
+
+      {showGroupSwitcher && myGroups.length > 1 && (
+        <div className="px-5 pb-2 max-w-md mx-auto">
+          <div className="rounded-[12px] p-2" style={{ background: "#FFFFFF", boxShadow: "0 1px 3px rgba(28,43,51,0.12)" }}>
+            <p className="text-[11px] uppercase tracking-wide opacity-55 px-2 pt-1 pb-2">
+              Ton carnet est partagé — change juste de vue
+            </p>
+            {myGroups.map((g) => (
+              <button
+                key={g.id}
+                onClick={() => handleSwitchGroup(g)}
+                className="w-full text-left px-2 py-2 rounded-[8px] text-[13px] flex items-center justify-between"
+                style={{
+                  background: g.id === session.groupId ? "#EDEAE1" : "transparent",
+                  color: "#1C2B33",
+                }}
+              >
+                <span>{g.name}</span>
+                {g.id === session.groupId && <span style={{ color: "#3F8755" }}>●</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="px-5 py-4 max-w-md mx-auto pb-24">
         {screen === "inventory" && (
