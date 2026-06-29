@@ -742,6 +742,7 @@ export function ProposalModal({ proposal, onClose, onSend }) {
 // ---------- Modale de confirmation : mettre à jour le carnet quand un échange est terminé ----------
 
 export function CompleteTradeModal({ trade, onClose, onConfirm }) {
+  const alreadyDone = trade.status === "done";
   return (
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
@@ -754,7 +755,7 @@ export function CompleteTradeModal({ trade, onClose, onConfirm }) {
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="font-display text-[18px] tracking-wide mb-3" style={{ color: "#1C2B33" }}>
-          ÉCHANGE RÉALISÉ AVEC {trade.neighbor.name.toUpperCase()}
+          {alreadyDone ? "MISE À JOUR DU CARNET" : "ÉCHANGE RÉALISÉ"} AVEC {trade.neighbor.name.toUpperCase()}
         </h3>
 
         <div className="flex flex-wrap gap-1.5 items-center mb-4">
@@ -872,6 +873,15 @@ export function TradesView({ trades, onUpdateStatus, onCancel, onRequestComplete
                 style={{ background: "#EDEAE1", color: "#1C2B33" }}
               >
                 Marquer comme réalisé
+              </button>
+            )}
+            {t.status === "done" && !t.inventoryApplied && (
+              <button
+                onClick={() => onRequestComplete(t)}
+                className="w-full py-1.5 rounded-[8px] text-[12px] mb-2"
+                style={{ background: "#EDEAE1", color: "#1C2B33" }}
+              >
+                Mettre à jour mon carnet avec ce résultat
               </button>
             )}
             {t.status !== "done" && (
