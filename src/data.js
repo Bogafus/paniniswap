@@ -118,3 +118,28 @@ export async function updateTradeStatus(tradeId, status) {
     .eq("id", tradeId);
   if (error) throw error;
 }
+
+// ---------- Messages d'échange (chat lié à un trade précis) ----------
+
+export async function fetchTradeMessages(tradeId) {
+  const { data, error } = await supabase
+    .from("trade_messages")
+    .select("id, sender_person_id, content, created_at, people:sender_person_id(display_name)")
+    .eq("trade_id", tradeId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data || []).map((row) => ({
+    id: row.id,
+    senderId: row.sender_person_id,
+    senderName: row.people?.display_name || "?",
+    content: row.content,
+    createdAt: row.created_at,
+  }));
+}
+
+export async function sendTradeMessage(tradeId, senderPersonId, content) {
+  const { error } = await supabase
+    .from("trade_messages")
+    .insert({ trade_id: tradeId, sender_person_id: senderPersonId, content: content.trim() });
+  if (error) throw error;
+}
