@@ -3,13 +3,14 @@ import JoinScreen from "./JoinScreen.jsx";
 import { resumeSession, clearSession, fetchMyGroups, switchActiveGroup, setMyPin } from "./auth.js";
 import {
   fetchMyInventory,
+  fetchMyAvailableInventory,
   upsertInventoryItem,
   fetchGroupMembersWithInventory,
   fetchMyTrades,
   createTrade,
   updateTradeStatus,
 } from "./data.js";
-import { InventoryView, MatchingView, TradesView, ProposalModal } from "./StickerSwap.jsx";
+import { InventoryView, MatchingView, TradesView, ProposalModal, CompleteTradeModal } from "./StickerSwap.jsx";
 import TradeChat from "./TradeChat.jsx";
 
 // Transforme une ligne "trades" Supabase (avec from_person/to_person joints)
@@ -33,6 +34,7 @@ export default function StickerSwapOnlineApp() {
   const [session, setSession] = useState(undefined); // undefined = chargement, null = pas connecté
   const [myGroups, setMyGroups] = useState([]); // tous les groupes de cette personne
   const [mine, setMine] = useState({ doubles: {}, needs: {} });
+  const [availableMine, setAvailableMine] = useState({ doubles: {}, needs: {} });
   const [neighbors, setNeighbors] = useState([]);
   const [trades, setTrades] = useState([]);
   const [activeGroup, setActiveGroup] = useState("A");
@@ -44,6 +46,7 @@ export default function StickerSwapOnlineApp() {
   const [pinSetupValue, setPinSetupValue] = useState("");
   const [pinSetupError, setPinSetupError] = useState(null);
   const [pinDismissed, setPinDismissed] = useState(false);
+  const [completingTrade, setCompletingTrade] = useState(null);
 
   // Reprise de session au chargement
   useEffect(() => {
@@ -72,14 +75,16 @@ export default function StickerSwapOnlineApp() {
     if (!session) return;
     setLoadingData(true);
     try {
-      const [members, tradeRows, groups] = await Promise.all([
+      const [members, tradeRows, groups, availableInv] = await Promise.all([
         fetchGroupMembersWithInventory(session.groupId, session.personId),
         fetchMyTrades(session.groupId, session.personId),
         fetchMyGroups(session.personId),
+        fetchMyAvailableInventory(session.personId, session.groupId),
       ]);
       setNeighbors(members.map((m) => ({ id: m.id, name: m.name, inventory: m.inventory })));
       setTrades(tradeRows.map((r) => mapTradeRow(r, session.personId)));
       setMyGroups(groups);
+      setAvailableMine(availableInv);
     } catch (err) {
       showToast(err.message || "Erreur de chargement, réessaie.");
     } finally {
@@ -158,6 +163,56 @@ export default function StickerSwapOnlineApp() {
   const handleUpdateStatus = async (tradeId, status) => {
     try {
       await updateTradeStatus(tradeId, status);
+      reloadGroupData();
+    } catch (err) {
+      showToast(err.message || "Impossible de mettre à jour l'échange.");
+    }
+  };
+
+  // Ouvre la modale de confirmation au lieu de marquer directement "done" :
+  // on demande d'abord si le carnet doit être mis à jour automatiquement.
+  const handleRequestComplete = (trade) => {
+    setCompletingTrade(trade);
+  };
+
+  const handleConfirmComplete = async (trade, shouldUpdateInventory) => {
+    setCompletingTrade(null);
+    try {
+      await updateTradeStatus(trade.id, "done");
+
+      if (shouldUpdateInventory) {
+        // Retire les vignettes données de mes doubles, et ajoute les vignettes
+        // reçues (en double si je n'en avais pas, sinon +1). Si une vignette
+        // reçue était dans mes besoins, elle en sort puisqu'elle est satisfaite.
+        setMine((prev) => {
+          const doubles = { ...prev.doubles };
+          const needs = { ...prev.needs };
+
+          trade.give.forEach((id) => {
+            const remaining = (doubles[id] || 0) - 1;
+            if (remaining > 0) {
+              doubles[id] = remaining;
+              upsertInventoryItem(session.personId, id, "double", remaining).catch((err) => showToast(err.message));
+            } else {
+              delete doubles[id];
+              upsertInventoryItem(session.personId, id, null).catch((err) => showToast(err.message));
+            }
+          });
+
+          trade.get.forEach((id) => {
+            const next = (doubles[id] || 0) + 1;
+            doubles[id] = next;
+            delete needs[id];
+            upsertInventoryItem(session.personId, id, "double", next).catch((err) => showToast(err.message));
+          });
+
+          return { doubles, needs };
+        });
+        showToast("Échange marqué comme réalisé · carnet mis à jour");
+      } else {
+        showToast("Échange marqué comme réalisé");
+      }
+
       reloadGroupData();
     } catch (err) {
       showToast(err.message || "Impossible de mettre à jour l'échange.");
@@ -328,7 +383,7 @@ export default function StickerSwapOnlineApp() {
         )}
         {screen === "matching" && (
           <MatchingView
-            mine={mine}
+            mine={availableMine}
             neighbors={neighbors}
             groupName={session.groupName}
             onOpenProposal={(neighbor, iCanGive, theyCanGive) => setProposal({ neighbor, iCanGive, theyCanGive })}
@@ -339,6 +394,7 @@ export default function StickerSwapOnlineApp() {
             trades={visibleTrades}
             onUpdateStatus={handleUpdateStatus}
             onCancel={handleCancel}
+            onRequestComplete={handleRequestComplete}
             myPersonId={session.personId}
             ChatComponent={TradeChat}
           />
@@ -398,6 +454,13 @@ export default function StickerSwapOnlineApp() {
       )}
 
       {proposal && <ProposalModal proposal={proposal} onClose={() => setProposal(null)} onSend={handleSend} />}
+      {completingTrade && (
+        <CompleteTradeModal
+          trade={completingTrade}
+          onClose={() => setCompletingTrade(null)}
+          onConfirm={handleConfirmComplete}
+        />
+      )}
     </div>
   );
 }
