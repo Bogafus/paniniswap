@@ -13,11 +13,6 @@ async function fetchActiveReservations(groupId) {
     .select("from_person_id, to_person_id, give_stickers, get_stickers, status")
     .eq("group_id", groupId)
     .in("status", ["pending", "accepted"]);
-  // DEBUG TEMPORAIRE — à retirer une fois le bug résolu.
-  console.log(
-    "[DEBUG fetchActiveReservations]",
-    JSON.stringify({ groupId, error, nbTradesFound: data ? data.length : null, data })
-  );
   if (error) throw error;
 
   // reservedGive[personId][stickerId] = quantité déjà promise à donner
@@ -94,21 +89,7 @@ export async function fetchMyAvailableInventory(personId, groupId) {
     fetchMyInventory(personId),
     fetchActiveReservations(groupId),
   ]);
-  const result = applyReservations(inventory, personId, reservedGive, reservedGet);
-  // DEBUG TEMPORAIRE — à retirer une fois le bug résolu. JSON.stringify pour
-  // figer un instantané réel (voir commentaire détaillé dans fetchGroupMembersWithInventory).
-  console.log(
-    "[DEBUG fetchMyAvailableInventory]",
-    JSON.stringify({
-      personId,
-      groupId,
-      rawInventory: inventory,
-      reservedGiveForMe: reservedGive[personId],
-      reservedGetForMe: reservedGet[personId],
-      result,
-    })
-  );
-  return result;
+  return applyReservations(inventory, personId, reservedGive, reservedGet);
 }
 
 // Met à jour (ou crée) une ligne d'inventaire pour une vignette donnée.
@@ -165,22 +146,6 @@ export async function fetchGroupMembersWithInventory(groupId, excludePersonId) {
         else needs[row.sticker_id] = true;
       });
     const available = applyReservations({ doubles, needs }, p.id, reservedGive, reservedGet);
-    // DEBUG TEMPORAIRE — à retirer une fois le bug résolu.
-    // JSON.stringify pour figer un instantané réel (évite l'artefact de lazy-evaluation
-    // de la console Chrome, qui peut afficher l'état ACTUEL d'un objet plutôt que
-    // son état au moment du console.log si l'objet est muté plus tard).
-    console.log(
-      "[DEBUG fetchGroupMembersWithInventory]",
-      JSON.stringify({
-        neighborId: p.id,
-        neighborName: p.display_name,
-        rawDoubles: doubles,
-        rawNeeds: needs,
-        reservedGiveForThem: reservedGive[p.id],
-        reservedGetForThem: reservedGet[p.id],
-        available,
-      })
-    );
     return {
       id: p.id,
       name: p.display_name,
