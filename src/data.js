@@ -232,3 +232,43 @@ export async function sendTradeMessage(tradeId, senderPersonId, content) {
     .insert({ trade_id: tradeId, sender_person_id: senderPersonId, content: content.trim() });
   if (error) throw error;
 }
+
+// ---------- Statut de lecture (pour le badge "nouveaux messages" sur le bouton de chat) ----------
+
+// Retourne, pour une liste de trade_id donnée, le nombre de messages non lus
+// par cette personne dans chacun (messages envoyés par quelqu'un d'autre,
+// postérieurs à la dernière fois que cette personne a ouvert ce chat).
+export async function fetchUnreadCounts(tradeIds, personId) {
+  if (!tradeIds || tradeIds.length === 0) return {};
+
+  const [{ data: reads, error: readsError }, { data: messages, error: messagesError }] = await Promise.all([
+    supabase.from("trade_read_status").select("trade_id, last_read_at").eq("person_id", personId).in("trade_id", tradeIds),
+    supabase.from("trade_messages").select("trade_id, sender_person_id, created_at").in("trade_id", tradeIds),
+  ]);
+  if (readsError) throw readsError;
+  if (messagesError) throw messagesError;
+
+  const lastReadByTrade = {};
+  (reads || []).forEach((r) => {
+    lastReadByTrade[r.trade_id] = r.last_read_at;
+  });
+
+  const counts = {};
+  (messages || []).forEach((m) => {
+    if (m.sender_person_id === personId) return; // mes propres messages ne comptent jamais comme "non lus"
+    const lastRead = lastReadByTrade[m.trade_id];
+    if (!lastRead || new Date(m.created_at) > new Date(lastRead)) {
+      counts[m.trade_id] = (counts[m.trade_id] || 0) + 1;
+    }
+  });
+  return counts;
+}
+
+// Marque un échange comme "lu maintenant" par cette personne (à appeler quand
+// le chat de cet échange est ouvert).
+export async function markTradeRead(tradeId, personId) {
+  const { error } = await supabase
+    .from("trade_read_status")
+    .upsert({ trade_id: tradeId, person_id: personId, last_read_at: new Date().toISOString() }, { onConflict: "trade_id,person_id" });
+  if (error) throw error;
+}
