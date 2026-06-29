@@ -799,7 +799,7 @@ export function CompleteTradeModal({ trade, onClose, onConfirm }) {
 
 // ---------- Vue Échanges en cours ----------
 
-export function TradesView({ trades, onUpdateStatus, onCancel, onRequestComplete, myPersonId, ChatComponent }) {
+export function TradesView({ trades, onUpdateStatus, onCancel, onRequestComplete, myPersonId, ChatComponent, unreadCounts = {}, onChatRead }) {
   const [openChatId, setOpenChatId] = useState(null);
 
   if (trades.length === 0) {
@@ -913,13 +913,23 @@ export function TradesView({ trades, onUpdateStatus, onCancel, onRequestComplete
               <>
                 <button
                   onClick={() => setOpenChatId((prev) => (prev === t.id ? null : t.id))}
-                  className="w-full py-1.5 rounded-[8px] text-[12px] flex items-center justify-center gap-1.5 mt-2"
+                  className="w-full py-1.5 rounded-[8px] text-[12px] flex items-center justify-center gap-1.5 mt-2 relative"
                   style={{ background: "#EDEAE1", color: "#1C2B33" }}
                 >
                   <span aria-hidden="true">💬</span>
                   {openChatId === t.id ? "Fermer la discussion" : "Discuter de cet échange"}
+                  {unreadCounts[t.id] > 0 && openChatId !== t.id && (
+                    <span
+                      className="absolute -top-1.5 -right-1.5 text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center"
+                      style={{ background: "#E8543E", color: "#F7F4ED" }}
+                    >
+                      {unreadCounts[t.id]}
+                    </span>
+                  )}
                 </button>
-                {openChatId === t.id && <ChatComponent tradeId={t.id} myPersonId={myPersonId} />}
+                {openChatId === t.id && (
+                  <ChatComponent tradeId={t.id} myPersonId={myPersonId} onRead={onChatRead} />
+                )}
               </>
             )}
           </div>
