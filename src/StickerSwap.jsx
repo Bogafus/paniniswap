@@ -884,6 +884,22 @@ export function TradesView({ trades, onUpdateStatus, onCancel, onRequestComplete
                 Mettre à jour mon carnet avec ce résultat
               </button>
             )}
+            {t.status === "done" && t.inventoryApplied && t.inventoryChoice === "auto" && (
+              <div
+                className="w-full py-1.5 rounded-[8px] text-[12px] mb-2 flex items-center justify-center gap-1.5"
+                style={{ background: "#E6F0EA", color: "#3F8755" }}
+              >
+                <span aria-hidden="true">✓</span> Carnet mis à jour automatiquement
+              </div>
+            )}
+            {t.status === "done" && t.inventoryApplied && t.inventoryChoice === "manual" && (
+              <div
+                className="w-full py-1.5 rounded-[8px] text-[12px] mb-2 flex items-center justify-center gap-1.5"
+                style={{ background: "#FBE5E1", color: "#E8543E" }}
+              >
+                <span aria-hidden="true">!</span> À mettre à jour toi-même dans ton carnet
+              </div>
+            )}
             {t.status !== "done" && (
               <button
                 onClick={() => onCancel(t.id)}
