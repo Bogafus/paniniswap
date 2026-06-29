@@ -9,6 +9,7 @@ import {
   fetchMyTrades,
   createTrade,
   updateTradeStatus,
+  markInventoryApplied,
 } from "./data.js";
 import { InventoryView, MatchingView, TradesView, ProposalModal, CompleteTradeModal } from "./StickerSwap.jsx";
 import TradeChat from "./TradeChat.jsx";
@@ -25,6 +26,7 @@ function mapTradeRow(row, myPersonId) {
     get: iAmSender ? row.get_stickers : row.give_stickers,
     method: row.method,
     status: row.status === "cancelled" ? "cancelled" : row.status,
+    inventoryApplied: iAmSender ? row.inventory_applied_from : row.inventory_applied_to,
     raw: row,
     iAmSender,
   };
@@ -178,7 +180,16 @@ export default function StickerSwapOnlineApp() {
   const handleConfirmComplete = async (trade, shouldUpdateInventory) => {
     setCompletingTrade(null);
     try {
-      await updateTradeStatus(trade.id, "done");
+      // Si l'échange n'était pas encore marqué "done", on le fait maintenant.
+      // S'il l'était déjà (cas d'un vieux échange qu'on met à jour après coup),
+      // on ne touche pas au statut, juste au carnet.
+      if (trade.status !== "done") {
+        await updateTradeStatus(trade.id, "done");
+      }
+
+      // Dans tous les cas (oui ou non), on note que ce côté a fait son choix,
+      // pour ne plus jamais re-proposer la mise à jour pour cet échange.
+      markInventoryApplied(trade.id, trade.iAmSender).catch((err) => showToast(err.message));
 
       if (shouldUpdateInventory) {
         // Retire les vignettes données de mes doubles, et ajoute les vignettes
@@ -208,7 +219,7 @@ export default function StickerSwapOnlineApp() {
 
           return { doubles, needs };
         });
-        showToast("Échange marqué comme réalisé · carnet mis à jour");
+        showToast("Carnet mis à jour avec le résultat de l'échange");
       } else {
         showToast("Échange marqué comme réalisé");
       }
