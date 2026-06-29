@@ -801,9 +801,7 @@ export function CompleteTradeModal({ trade, onClose, onConfirm }) {
 
 // ---------- Vue Échanges en cours ----------
 
-export function TradesView({ trades, onUpdateStatus, onCancel, onRequestComplete, myPersonId, ChatComponent, unreadCounts = {}, onChatRead }) {
-  const [openChatId, setOpenChatId] = useState(null);
-
+export function TradesView({ trades, onUpdateStatus, onCancel, onRequestComplete, myPersonId, ChatComponent, unreadCounts = {}, onChatRead, openChatId, setOpenChatId }) {
   if (trades.length === 0) {
     return (
       <div className="py-16 text-center">
