@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { fetchTradeMessages, sendTradeMessage } from "./data.js";
+import { fetchTradeMessages, sendTradeMessage, markTradeRead } from "./data.js";
 
 // Chat simple attaché à un échange précis. Affiché en pli dépliable sous la
 // carte de l'échange. Rafraîchit la liste toutes les 4 secondes pendant que
 // le chat est ouvert (pas de websocket, juste un polling léger).
-export default function TradeChat({ tradeId, myPersonId }) {
+export default function TradeChat({ tradeId, myPersonId, onRead }) {
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -26,6 +26,14 @@ export default function TradeChat({ tradeId, myPersonId }) {
     return () => clearInterval(interval);
   }, [reload]);
 
+  // Dès que ce chat est ouvert (monté), on le marque comme lu — ça fait
+  // disparaître le badge "nouveaux messages" sur le bouton qui l'a ouvert.
+  useEffect(() => {
+    markTradeRead(tradeId, myPersonId)
+      .then(() => onRead && onRead(tradeId))
+      .catch(() => {});
+  }, [tradeId, myPersonId, onRead]);
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -42,6 +50,7 @@ export default function TradeChat({ tradeId, myPersonId }) {
       await sendTradeMessage(tradeId, myPersonId, content);
       setDraft("");
       await reload();
+      markTradeRead(tradeId, myPersonId).catch(() => {});
     } catch (err) {
       setError(err.message || "Message non envoyé, réessaie.");
     } finally {
