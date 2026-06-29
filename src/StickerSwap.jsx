@@ -739,9 +739,66 @@ export function ProposalModal({ proposal, onClose, onSend }) {
   );
 }
 
+// ---------- Modale de confirmation : mettre à jour le carnet quand un échange est terminé ----------
+
+export function CompleteTradeModal({ trade, onClose, onConfirm }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      style={{ background: "rgba(28,43,51,0.55)" }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full sm:max-w-sm rounded-t-[20px] sm:rounded-[20px] p-5"
+        style={{ background: "#F7F4ED" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="font-display text-[18px] tracking-wide mb-3" style={{ color: "#1C2B33" }}>
+          ÉCHANGE RÉALISÉ AVEC {trade.neighbor.name.toUpperCase()}
+        </h3>
+
+        <div className="flex flex-wrap gap-1.5 items-center mb-4">
+          {trade.give.map((id) => (
+            <span key={id} className="font-display text-[11px] px-1.5 py-0.5 rounded" style={{ background: "#1C2B33", color: "#F7F4ED" }}>
+              {formatStickerLabel(id)}
+            </span>
+          ))}
+          <span className="text-[12px] opacity-50 px-1">→</span>
+          {trade.get.map((id) => (
+            <span key={id} className="font-display text-[11px] px-1.5 py-0.5 rounded border" style={{ borderColor: "#E8543E", color: "#E8543E" }}>
+              {formatStickerLabel(id)}
+            </span>
+          ))}
+        </div>
+
+        <p className="text-[13px] opacity-70 mb-5 leading-relaxed">
+          Veux-tu que je mette à jour ton carnet automatiquement avec le résultat de cet échange ? Les vignettes données seront retirées de tes doubles, et celles reçues y seront ajoutées.
+        </p>
+
+        <div className="space-y-2">
+          <button
+            onClick={() => onConfirm(trade, true)}
+            className="w-full py-3 rounded-[12px] font-display text-[14px] tracking-wide"
+            style={{ background: "#3F8755", color: "#F7F4ED" }}
+          >
+            OUI, METTRE À JOUR AUTOMATIQUEMENT
+          </button>
+          <button
+            onClick={() => onConfirm(trade, false)}
+            className="w-full py-3 rounded-[12px] font-display text-[14px] tracking-wide"
+            style={{ background: "#EDEAE1", color: "#1C2B33" }}
+          >
+            NON, JE M'EN OCCUPE MOI-MÊME
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---------- Vue Échanges en cours ----------
 
-export function TradesView({ trades, onUpdateStatus, onCancel, myPersonId, ChatComponent }) {
+export function TradesView({ trades, onUpdateStatus, onCancel, onRequestComplete, myPersonId, ChatComponent }) {
   const [openChatId, setOpenChatId] = useState(null);
 
   if (trades.length === 0) {
@@ -810,7 +867,7 @@ export function TradesView({ trades, onUpdateStatus, onCancel, myPersonId, ChatC
             )}
             {t.status === "accepted" && (
               <button
-                onClick={() => onUpdateStatus(t.id, "done")}
+                onClick={() => onRequestComplete(t)}
                 className="w-full py-1.5 rounded-[8px] text-[12px] mb-2"
                 style={{ background: "#EDEAE1", color: "#1C2B33" }}
               >
