@@ -89,7 +89,17 @@ export async function fetchMyAvailableInventory(personId, groupId) {
     fetchMyInventory(personId),
     fetchActiveReservations(groupId),
   ]);
-  return applyReservations(inventory, personId, reservedGive, reservedGet);
+  const result = applyReservations(inventory, personId, reservedGive, reservedGet);
+  // DEBUG TEMPORAIRE — à retirer une fois le bug résolu.
+  console.log("[DEBUG fetchMyAvailableInventory]", {
+    personId,
+    groupId,
+    rawInventory: inventory,
+    reservedGiveForMe: reservedGive[personId],
+    reservedGetForMe: reservedGet[personId],
+    result,
+  });
+  return result;
 }
 
 // Met à jour (ou crée) une ligne d'inventaire pour une vignette donnée.
@@ -146,6 +156,16 @@ export async function fetchGroupMembersWithInventory(groupId, excludePersonId) {
         else needs[row.sticker_id] = true;
       });
     const available = applyReservations({ doubles, needs }, p.id, reservedGive, reservedGet);
+    // DEBUG TEMPORAIRE — à retirer une fois le bug résolu.
+    console.log("[DEBUG fetchGroupMembersWithInventory]", {
+      neighborId: p.id,
+      neighborName: p.display_name,
+      rawDoubles: doubles,
+      rawNeeds: needs,
+      reservedGiveForThem: reservedGive[p.id],
+      reservedGetForThem: reservedGet[p.id],
+      available,
+    });
     return {
       id: p.id,
       name: p.display_name,
