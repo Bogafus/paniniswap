@@ -741,7 +741,9 @@ export function ProposalModal({ proposal, onClose, onSend }) {
 
 // ---------- Vue Échanges en cours ----------
 
-export function TradesView({ trades, onUpdateStatus, onCancel }) {
+export function TradesView({ trades, onUpdateStatus, onCancel, myPersonId, ChatComponent }) {
+  const [openChatId, setOpenChatId] = useState(null);
+
   if (trades.length === 0) {
     return (
       <div className="py-16 text-center">
@@ -823,6 +825,19 @@ export function TradesView({ trades, onUpdateStatus, onCancel }) {
               >
                 <span aria-hidden="true">↺</span> Annuler et libérer mes vignettes
               </button>
+            )}
+            {ChatComponent && (
+              <>
+                <button
+                  onClick={() => setOpenChatId((prev) => (prev === t.id ? null : t.id))}
+                  className="w-full py-1.5 rounded-[8px] text-[12px] flex items-center justify-center gap-1.5 mt-2"
+                  style={{ background: "#EDEAE1", color: "#1C2B33" }}
+                >
+                  <span aria-hidden="true">💬</span>
+                  {openChatId === t.id ? "Fermer la discussion" : "Discuter de cet échange"}
+                </button>
+                {openChatId === t.id && <ChatComponent tradeId={t.id} myPersonId={myPersonId} />}
+              </>
             )}
           </div>
         ))}
