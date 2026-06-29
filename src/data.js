@@ -1,5 +1,65 @@
 import { supabase } from "./supabaseClient.js";
 
+// ---------- Réservations : vignettes déjà engagées dans un échange actif ----------
+
+// Récupère tous les échanges actifs (pending/accepted, pas cancelled/done) d'un
+// groupe, et retourne pour chaque personne combien d'unités de chaque vignette
+// elle a déjà promises (give) ou s'attend à recevoir (get). Sert à exclure ces
+// vignettes du matching et de l'inventaire "disponible", pour éviter qu'une
+// même vignette soit proposée à deux personnes différentes en même temps.
+async function fetchActiveReservations(groupId) {
+  const { data, error } = await supabase
+    .from("trades")
+    .select("from_person_id, to_person_id, give_stickers, get_stickers, status")
+    .eq("group_id", groupId)
+    .in("status", ["pending", "accepted"]);
+  if (error) throw error;
+
+  // reservedGive[personId][stickerId] = quantité déjà promise à donner
+  // reservedGet[personId][stickerId] = quantité déjà attendue à recevoir
+  const reservedGive = {};
+  const reservedGet = {};
+
+  const addCount = (map, personId, stickerId) => {
+    if (!map[personId]) map[personId] = {};
+    map[personId][stickerId] = (map[personId][stickerId] || 0) + 1;
+  };
+
+  (data || []).forEach((trade) => {
+    (trade.give_stickers || []).forEach((stickerId) => addCount(reservedGive, trade.from_person_id, stickerId));
+    (trade.get_stickers || []).forEach((stickerId) => addCount(reservedGet, trade.from_person_id, stickerId));
+    // Du point de vue du destinataire (to_person), c'est l'inverse : ce qu'il reçoit
+    // (give_stickers de l'expéditeur) est ce qu'IL attend, et ce qu'il donne, c'est get_stickers.
+    (trade.give_stickers || []).forEach((stickerId) => addCount(reservedGet, trade.to_person_id, stickerId));
+    (trade.get_stickers || []).forEach((stickerId) => addCount(reservedGive, trade.to_person_id, stickerId));
+  });
+
+  return { reservedGive, reservedGet };
+}
+
+// Applique les réservations à un inventaire {doubles, needs} pour une personne donnée :
+// les quantités déjà promises sont retirées des doubles disponibles, et les
+// vignettes déjà attendues dans un échange en cours sont retirées des besoins
+// (pas la peine de les proposer à nouveau ailleurs tant que l'échange est actif).
+function applyReservations(inventory, personId, reservedGive, reservedGet) {
+  const doubles = { ...inventory.doubles };
+  const needs = { ...inventory.needs };
+
+  const givenAway = reservedGive[personId] || {};
+  Object.entries(givenAway).forEach(([stickerId, qty]) => {
+    const remaining = (doubles[stickerId] || 0) - qty;
+    if (remaining > 0) doubles[stickerId] = remaining;
+    else delete doubles[stickerId];
+  });
+
+  const incoming = reservedGet[personId] || {};
+  Object.keys(incoming).forEach((stickerId) => {
+    delete needs[stickerId];
+  });
+
+  return { doubles, needs };
+}
+
 // ---------- Inventaire (rattaché à la PERSONNE, partagé entre tous ses groupes) ----------
 
 // Charge l'inventaire (doubles + besoins) d'une personne, au même format
@@ -18,6 +78,18 @@ export async function fetchMyInventory(personId) {
     else needs[row.sticker_id] = true;
   });
   return { doubles, needs };
+}
+
+// Variante de fetchMyInventory qui exclut les vignettes déjà engagées dans un
+// échange actif de ce groupe — c'est cette version qu'il faut utiliser pour le
+// matching et pour la sélection de vignettes à proposer (pas pour l'écran
+// "Mon carnet", qui doit montrer le stock réel).
+export async function fetchMyAvailableInventory(personId, groupId) {
+  const [inventory, { reservedGive, reservedGet }] = await Promise.all([
+    fetchMyInventory(personId),
+    fetchActiveReservations(groupId),
+  ]);
+  return applyReservations(inventory, personId, reservedGive, reservedGet);
 }
 
 // Met à jour (ou crée) une ligne d'inventaire pour une vignette donnée.
@@ -44,7 +116,8 @@ export async function upsertInventoryItem(personId, stickerId, status, quantity 
 // ---------- Membres du groupe (pour le matching) ----------
 
 // Récupère toutes les autres personnes du groupe (via person_groups) avec leur
-// inventaire, au même format que NEIGHBOR_INVENTORIES dans le prototype.
+// inventaire DISPONIBLE (déjà net des vignettes engagées dans un échange actif,
+// pour ce groupe), au même format que NEIGHBOR_INVENTORIES dans le prototype.
 export async function fetchGroupMembersWithInventory(groupId, excludePersonId) {
   const { data: links, error: linksError } = await supabase
     .from("person_groups")
@@ -57,10 +130,10 @@ export async function fetchGroupMembersWithInventory(groupId, excludePersonId) {
   if (persons.length === 0) return [];
 
   const personIds = persons.map((p) => p.id);
-  const { data: items, error: itemsError } = await supabase
-    .from("inventory_items")
-    .select("person_id, sticker_id, status, quantity")
-    .in("person_id", personIds);
+  const [{ data: items, error: itemsError }, { reservedGive, reservedGet }] = await Promise.all([
+    supabase.from("inventory_items").select("person_id, sticker_id, status, quantity").in("person_id", personIds),
+    fetchActiveReservations(groupId),
+  ]);
   if (itemsError) throw itemsError;
 
   return persons.map((p) => {
@@ -72,10 +145,11 @@ export async function fetchGroupMembersWithInventory(groupId, excludePersonId) {
         if (row.status === "double") doubles[row.sticker_id] = row.quantity;
         else needs[row.sticker_id] = true;
       });
+    const available = applyReservations({ doubles, needs }, p.id, reservedGive, reservedGet);
     return {
       id: p.id,
       name: p.display_name,
-      inventory: { doubles, needs },
+      inventory: available,
     };
   });
 }
