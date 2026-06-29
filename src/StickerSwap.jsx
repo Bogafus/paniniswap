@@ -475,6 +475,12 @@ function computeMatch(mine, theirInv) {
 
 export function MatchingView({ mine, neighbors, groupName, onOpenProposal }) {
   const matches = useMemo(() => {
+    // DEBUG TEMPORAIRE — à retirer une fois le bug résolu.
+    console.log("[DEBUG MatchingView] mine.needs=", JSON.stringify(mine.needs));
+    console.log("[DEBUG MatchingView] mine.doubles=", JSON.stringify(mine.doubles));
+    neighbors.forEach((n) => {
+      console.log(`[DEBUG MatchingView] neighbor ${n.name} doubles=`, JSON.stringify(n.inventory.doubles));
+    });
     return neighbors
       .map((n) => {
         const m = computeMatch(mine, n.inventory);
