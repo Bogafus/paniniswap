@@ -10,6 +10,7 @@ import {
   createTrade,
   updateTradeStatus,
   markInventoryApplied,
+  fetchUnreadCounts,
 } from "./data.js";
 import { InventoryView, MatchingView, TradesView, ProposalModal, CompleteTradeModal } from "./StickerSwap.jsx";
 import TradeChat from "./TradeChat.jsx";
@@ -50,6 +51,7 @@ export default function StickerSwapOnlineApp() {
   const [pinSetupError, setPinSetupError] = useState(null);
   const [pinDismissed, setPinDismissed] = useState(false);
   const [completingTrade, setCompletingTrade] = useState(null);
+  const [unreadCounts, setUnreadCounts] = useState({});
 
   // Reprise de session au chargement
   useEffect(() => {
@@ -85,9 +87,15 @@ export default function StickerSwapOnlineApp() {
         fetchMyAvailableInventory(session.personId, session.groupId),
       ]);
       setNeighbors(members.map((m) => ({ id: m.id, name: m.name, inventory: m.inventory })));
-      setTrades(tradeRows.map((r) => mapTradeRow(r, session.personId)));
+      const mappedTrades = tradeRows.map((r) => mapTradeRow(r, session.personId));
+      setTrades(mappedTrades);
       setMyGroups(groups);
       setAvailableMine(availableInv);
+
+      const activeTradeIds = mappedTrades.filter((t) => t.status !== "cancelled").map((t) => t.id);
+      fetchUnreadCounts(activeTradeIds, session.personId)
+        .then(setUnreadCounts)
+        .catch(() => {});
     } catch (err) {
       showToast(err.message || "Erreur de chargement, réessaie.");
     } finally {
@@ -411,6 +419,8 @@ export default function StickerSwapOnlineApp() {
             onRequestComplete={handleRequestComplete}
             myPersonId={session.personId}
             ChatComponent={TradeChat}
+            unreadCounts={unreadCounts}
+            onChatRead={(tradeId) => setUnreadCounts((prev) => ({ ...prev, [tradeId]: 0 }))}
           />
         )}
       </div>
