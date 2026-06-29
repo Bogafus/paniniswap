@@ -10,6 +10,7 @@ import {
   updateTradeStatus,
 } from "./data.js";
 import { InventoryView, MatchingView, TradesView, ProposalModal } from "./StickerSwap.jsx";
+import TradeChat from "./TradeChat.jsx";
 
 // Transforme une ligne "trades" Supabase (avec from_person/to_person joints)
 // vers le format attendu par TradesView : { id, neighbor: {name}, give, get, method, status }
@@ -260,7 +261,7 @@ export default function StickerSwapOnlineApp() {
           >
             <div className="flex items-start justify-between gap-2 mb-2">
               <p className="text-[12px] leading-snug" style={{ color: "#1C2B33" }}>
-                Crée un code à 4 chiffres pour pouvoir te reconnecter depuis un autre téléphone plus tard.
+                Si c'est ton premier login, change ton code PIN et note-le bien pour pouvoir te reconnecter depuis un autre appareil plus tard.
               </p>
               <button
                 type="button"
@@ -334,7 +335,13 @@ export default function StickerSwapOnlineApp() {
           />
         )}
         {screen === "trades" && (
-          <TradesView trades={visibleTrades} onUpdateStatus={handleUpdateStatus} onCancel={handleCancel} />
+          <TradesView
+            trades={visibleTrades}
+            onUpdateStatus={handleUpdateStatus}
+            onCancel={handleCancel}
+            myPersonId={session.personId}
+            ChatComponent={TradeChat}
+          />
         )}
       </div>
 
