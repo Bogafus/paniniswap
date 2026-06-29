@@ -52,6 +52,7 @@ export default function StickerSwapOnlineApp() {
   const [pinDismissed, setPinDismissed] = useState(false);
   const [completingTrade, setCompletingTrade] = useState(null);
   const [unreadCounts, setUnreadCounts] = useState({});
+  const [openChatId, setOpenChatId] = useState(null);
 
   // Reprise de session au chargement
   useEffect(() => {
@@ -103,10 +104,34 @@ export default function StickerSwapOnlineApp() {
     }
   }, [session, showToast]);
 
+  // Rafraîchit uniquement les compteurs "non lus" — léger, donc peut tourner
+  // en polling fréquent sans recharger tout le reste (inventaire, voisins...).
+  const reloadUnreadCounts = useCallback(async () => {
+    if (!session) return;
+    const activeTradeIds = trades.filter((t) => t.status !== "cancelled" && t.id !== openChatId).map((t) => t.id);
+    if (activeTradeIds.length === 0) return;
+    try {
+      const counts = await fetchUnreadCounts(activeTradeIds, session.personId);
+      // On fusionne plutôt que remplacer, pour ne pas effacer le compteur (à 0)
+      // du chat actuellement ouvert, qu'on n'a volontairement pas recalculé ci-dessus.
+      setUnreadCounts((prev) => ({ ...prev, ...counts }));
+    } catch {
+      // échec silencieux : ce n'est qu'un badge, pas grave si un cycle rate
+    }
+  }, [session, trades, openChatId]);
+
   useEffect(() => {
     reloadInventory();
     reloadGroupData();
   }, [reloadInventory, reloadGroupData]);
+
+  // Polling léger pour que le badge "nouveaux messages" apparaisse tout seul
+  // sur le bouton "Discuter de cet échange", sans avoir à recharger la page.
+  useEffect(() => {
+    if (!session) return;
+    const interval = setInterval(reloadUnreadCounts, 5000);
+    return () => clearInterval(interval);
+  }, [session, reloadUnreadCounts]);
 
   if (session === undefined) {
     return (
@@ -421,6 +446,8 @@ export default function StickerSwapOnlineApp() {
             ChatComponent={TradeChat}
             unreadCounts={unreadCounts}
             onChatRead={(tradeId) => setUnreadCounts((prev) => ({ ...prev, [tradeId]: 0 }))}
+            openChatId={openChatId}
+            setOpenChatId={setOpenChatId}
           />
         )}
       </div>
