@@ -13,6 +13,11 @@ async function fetchActiveReservations(groupId) {
     .select("from_person_id, to_person_id, give_stickers, get_stickers, status")
     .eq("group_id", groupId)
     .in("status", ["pending", "accepted"]);
+  // DEBUG TEMPORAIRE — à retirer une fois le bug résolu.
+  console.log(
+    "[DEBUG fetchActiveReservations]",
+    JSON.stringify({ groupId, error, nbTradesFound: data ? data.length : null, data })
+  );
   if (error) throw error;
 
   // reservedGive[personId][stickerId] = quantité déjà promise à donner
