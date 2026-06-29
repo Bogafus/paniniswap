@@ -90,15 +90,19 @@ export async function fetchMyAvailableInventory(personId, groupId) {
     fetchActiveReservations(groupId),
   ]);
   const result = applyReservations(inventory, personId, reservedGive, reservedGet);
-  // DEBUG TEMPORAIRE — à retirer une fois le bug résolu.
-  console.log("[DEBUG fetchMyAvailableInventory]", {
-    personId,
-    groupId,
-    rawInventory: inventory,
-    reservedGiveForMe: reservedGive[personId],
-    reservedGetForMe: reservedGet[personId],
-    result,
-  });
+  // DEBUG TEMPORAIRE — à retirer une fois le bug résolu. JSON.stringify pour
+  // figer un instantané réel (voir commentaire détaillé dans fetchGroupMembersWithInventory).
+  console.log(
+    "[DEBUG fetchMyAvailableInventory]",
+    JSON.stringify({
+      personId,
+      groupId,
+      rawInventory: inventory,
+      reservedGiveForMe: reservedGive[personId],
+      reservedGetForMe: reservedGet[personId],
+      result,
+    })
+  );
   return result;
 }
 
@@ -157,15 +161,21 @@ export async function fetchGroupMembersWithInventory(groupId, excludePersonId) {
       });
     const available = applyReservations({ doubles, needs }, p.id, reservedGive, reservedGet);
     // DEBUG TEMPORAIRE — à retirer une fois le bug résolu.
-    console.log("[DEBUG fetchGroupMembersWithInventory]", {
-      neighborId: p.id,
-      neighborName: p.display_name,
-      rawDoubles: doubles,
-      rawNeeds: needs,
-      reservedGiveForThem: reservedGive[p.id],
-      reservedGetForThem: reservedGet[p.id],
-      available,
-    });
+    // JSON.stringify pour figer un instantané réel (évite l'artefact de lazy-evaluation
+    // de la console Chrome, qui peut afficher l'état ACTUEL d'un objet plutôt que
+    // son état au moment du console.log si l'objet est muté plus tard).
+    console.log(
+      "[DEBUG fetchGroupMembersWithInventory]",
+      JSON.stringify({
+        neighborId: p.id,
+        neighborName: p.display_name,
+        rawDoubles: doubles,
+        rawNeeds: needs,
+        reservedGiveForThem: reservedGive[p.id],
+        reservedGetForThem: reservedGet[p.id],
+        available,
+      })
+    );
     return {
       id: p.id,
       name: p.display_name,
