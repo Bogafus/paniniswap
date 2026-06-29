@@ -193,6 +193,14 @@ export async function updateTradeStatus(tradeId, status) {
   if (error) throw error;
 }
 
+// Marque le carnet d'un côté donné (expéditeur ou destinataire) comme déjà
+// mis à jour suite à un échange — empêche d'appliquer deux fois le même résultat.
+export async function markInventoryApplied(tradeId, isSender) {
+  const column = isSender ? "inventory_applied_from" : "inventory_applied_to";
+  const { error } = await supabase.from("trades").update({ [column]: true }).eq("id", tradeId);
+  if (error) throw error;
+}
+
 // ---------- Messages d'échange (chat lié à un trade précis) ----------
 
 export async function fetchTradeMessages(tradeId) {
