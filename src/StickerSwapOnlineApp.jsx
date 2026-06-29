@@ -27,6 +27,7 @@ function mapTradeRow(row, myPersonId) {
     method: row.method,
     status: row.status === "cancelled" ? "cancelled" : row.status,
     inventoryApplied: iAmSender ? row.inventory_applied_from : row.inventory_applied_to,
+    inventoryChoice: iAmSender ? row.inventory_choice_from : row.inventory_choice_to,
     raw: row,
     iAmSender,
   };
@@ -189,7 +190,9 @@ export default function StickerSwapOnlineApp() {
 
       // Dans tous les cas (oui ou non), on note que ce côté a fait son choix,
       // pour ne plus jamais re-proposer la mise à jour pour cet échange.
-      markInventoryApplied(trade.id, trade.iAmSender).catch((err) => showToast(err.message));
+      markInventoryApplied(trade.id, trade.iAmSender, shouldUpdateInventory ? "auto" : "manual").catch((err) =>
+        showToast(err.message)
+      );
 
       if (shouldUpdateInventory) {
         // Retire les vignettes données de mes doubles, et ajoute les vignettes
