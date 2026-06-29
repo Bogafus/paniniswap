@@ -194,10 +194,17 @@ export async function updateTradeStatus(tradeId, status) {
 }
 
 // Marque le carnet d'un côté donné (expéditeur ou destinataire) comme déjà
-// mis à jour suite à un échange — empêche d'appliquer deux fois le même résultat.
-export async function markInventoryApplied(tradeId, isSender) {
-  const column = isSender ? "inventory_applied_from" : "inventory_applied_to";
-  const { error } = await supabase.from("trades").update({ [column]: true }).eq("id", tradeId);
+// traité suite à un échange, en précisant le choix fait : "auto" (carnet mis
+// à jour automatiquement) ou "manual" (la personne s'en occupe elle-même).
+// Empêche d'afficher à nouveau la proposition pour cet échange, et permet
+// d'afficher le bon badge ("Carnet mis à jour" vs "À mettre à jour manuellement").
+export async function markInventoryApplied(tradeId, isSender, choice) {
+  const appliedColumn = isSender ? "inventory_applied_from" : "inventory_applied_to";
+  const choiceColumn = isSender ? "inventory_choice_from" : "inventory_choice_to";
+  const { error } = await supabase
+    .from("trades")
+    .update({ [appliedColumn]: true, [choiceColumn]: choice })
+    .eq("id", tradeId);
   if (error) throw error;
 }
 
