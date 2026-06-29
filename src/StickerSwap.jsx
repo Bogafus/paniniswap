@@ -717,6 +717,8 @@ export function ProposalModal({ proposal, onClose, onSend }) {
           {selectedGive.size} contre {selectedGet.size} ·{" "}
           {selectedGive.size === selectedGet.size ? (
             <span style={{ color: "#3F8755" }}>échange équilibré</span>
+          ) : selectedGive.size === 0 || selectedGet.size === 0 ? (
+            <span style={{ color: "#C9A24B" }}>don à sens unique</span>
           ) : (
             <span style={{ color: "#E8543E" }}>échange déséquilibré</span>
           )}
@@ -728,7 +730,7 @@ export function ProposalModal({ proposal, onClose, onSend }) {
 
         <button
           onClick={() => onSend(method, [...selectedGive], [...selectedGet])}
-          disabled={selectedGive.size === 0 || selectedGet.size === 0}
+          disabled={selectedGive.size === 0 && selectedGet.size === 0}
           className="w-full py-3 rounded-[12px] font-display text-[14px] tracking-wide disabled:opacity-40"
           style={{ background: "#3F8755", color: "#F7F4ED" }}
         >
